@@ -48,7 +48,7 @@ Key components:
    - Create a `.env` file in the root directory.
    - Add your OpenAI API key: `OPENAI_API_KEY=your_key_here`.
 
-4. Ensure Python 3.8+ is installed.
+4. Ensure Python 3.9+ is installed (developed and tested on 3.12).
 
 ## Data Preparation
 The dataset is sourced from Bitext's customer support data. Cleaning involves removing duplicates, normalizing text, and adding features like sentiment and response length.
@@ -84,18 +84,22 @@ Evaluation combines human ratings with automated metrics into a hybrid score.
   - Output: benchmark_with_sentiment.csv.
 - **Hybrid Scoring**: evaluate_hybrid_scores.py merges with human ratings and computes scores.
   - Human Ratings: Assumed in human_ratings.csv (scale: 1-5, see results/human_rating/human_weighting_scoring.txt).
-  - Formula: `hybrid_score = 0.55 * human_norm + 0.20 * sentiment_norm + 0.20 * (1 - latency_norm) + 0.05 * (1 - length_norm)`.
-  - Outputs: merged_full_evaluation.csv and final_prompt_ranking.csv.
+  - Formula (profile `v1`, the default): `hybrid_score = 0.55 * human_norm + 0.20 * sentiment_norm + 0.20 * (1 - latency_norm) + 0.05 * (1 - length_norm)`. Each metric is min-max scaled over the values in the data, so ratings that only span 2-5 map a 2 to 0.0.
+  - Experimental profile `v2`: `0.60 * human + 0.15 * reference_similarity + 0.20 * speed + 0.05 * brevity`, with a fixed 1-5 human scale and sentiment dropped (the prompts themselves ask for a warm or a formal tone, so sentiment mostly measures the instruction). `reference_similarity` is the TF-IDF cosine similarity to the dataset's `expected_response`. These weights are untested; use `v1` for anything you report.
+  - Human ratings are matched to responses on `(customer_query, model_response)`. Duplicated or unmatched rows stop the run with a message instead of being silently dropped.
+  - Outputs: merged_full_evaluation.csv and final_prompt_ranking.csv (also lists `n` and the mean `reference_similarity`).
 
 Run via:
 ```bash
-python scripts/evaluate/evaluate_hybrid_scores.py
+python scripts/evaluate/evaluate_hybrid_scores.py                 # profile v1, writes into results/evaluation/
+python scripts/evaluate/evaluate_hybrid_scores.py --profile v2 --out-dir /tmp/eval_v2   # try v2 without touching the committed results
 ```
 
 ## Results
 - **Benchmark Results**: Raw outputs in benchmark.
 - **Evaluated Rankings**: See final_prompt_ranking.csv for model/prompt rankings by hybrid score.
-- **Insights**: Faster models (e.g., GPT-4o-mini) may score higher on latency, while larger models excel in quality.
+- **Committed run** (50 queries x 2 prompts x 3 models = 300 rated responses): `gpt-4o` with `expanded_friendly` ranks first (hybrid 0.839). `gpt-3.5-turbo` was the fastest (0.79-0.88 s) and `gpt-4o-mini` the slowest (1.4-1.6 s), so in this run the smaller model was not the faster one. With 50 queries per cell and a single rating per response, treat the gaps between neighbouring rows as noise.
+- **Prompt effect**: `expanded_friendly` outscores `expanded_professional` for every model. Part of that gap is built in: the friendly prompt asks for a warm tone and the professional prompt does not, and sentiment carries 20% of the v1 score.
 
 ## Usage
 1. Prepare data using data_cleaning.ipynb.
@@ -106,10 +110,16 @@ python scripts/evaluate/evaluate_hybrid_scores.py
 
 For custom prompts, edit templates.md.
 
+## Tests
+```bash
+python -m unittest discover -s tests -v
+```
+Covers the evaluation script (rating merge, scaling, both profiles) and checks that profile `v1` still reproduces the committed `results/evaluation/final_prompt_ranking.csv`. Standard library only; `benchmark.py` is not covered because it calls the OpenAI API.
+
 ## Contributing
 - Fork the repo and submit pull requests.
 - Report issues via GitHub.
 - Follow the project's focus on prompt engineering and hybrid evaluation.
 
 ## License
-This project is licensed under the MIT License. See LICENSE for details.
+No license file has been added to this repository yet, so no license is granted. Add a `LICENSE` file (for example MIT) before sharing the code outside the team.
