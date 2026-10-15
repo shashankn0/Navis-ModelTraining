@@ -1,5 +1,5 @@
 """
-evaluate.py
+add_sentiment.py
 -----------
 This script computes sentiment analysis for each model response from the benchmark results.
 It reads the CSV with human scores (if available), adds sentiment metrics, and saves a new enriched CSV.
@@ -35,7 +35,7 @@ def add_sentiment_scores(input_path: str, output_path: str) -> pd.DataFrame:
         lambda txt: compute_sentiment(txt, analyzer)
     )
 
-    # Normalize from -1..1 → 0..1 for easier weighting
+    # Normalize from -1..1 -> 0..1 for easier weighting
     df["sentiment_norm"] = df["sentiment_score"].apply(
         lambda s: (s + 1) / 2 if pd.notna(s) else None
     )
@@ -47,7 +47,7 @@ def add_sentiment_scores(input_path: str, output_path: str) -> pd.DataFrame:
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_csv(output_path, index=False)
-    print(f"Saved sentiment-enriched file → {output_path}")
+    print(f"Saved sentiment-enriched file -> {output_path}")
     return df
 
 
